@@ -28,23 +28,58 @@
 					Those shipyards will be part of an event group for the sub-cue.
 					It also adds the builder handler cue to existing build ships.
 				-->
-				<cue name="cap_ship_interdict_handlers">
+				<cue name="cap_ship_interdict_handlers" version="2">
 					<conditions>
 						<event_cue_signalled />
 					</conditions>
-					<actions>
-						<find_station groupname="$trackedshipyards" space="player.galaxy" multiple="true" shipyard="true" />
-						<debug_to_file text="'==cap_ship_interdict==all shipyards count: ' + $trackedshipyards.count" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
-					</actions>
 					<delay min="1s" max="2s" />
 					<actions>
+						<find_station groupname="$trackedshipyards" space="player.galaxy" multiple="true" shipyard="true" />
+						<do_for_each in="$trackedshipyards" name="$shipyard">
+							<debug_to_file text="'==cap_ship_interdict==resgistering shipyard %s (%s)'.[$shipyard.knownname, $shipyard.idcode]" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+						</do_for_each>
+						<signal_cue cue="init_shipyard_event_handlers" />
+
 						<find_ship name="$builders" space="player.galaxy" multiple="true" primarypurpose="purpose.build" class="class.ship_xl" />
 						<debug_to_file text="'==cap_ship_interdict==all builder ships count: ' + $builders.count" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
 						<do_for_each in="$builders" name="$builder">
 							<signal_cue_instantly cue="cap_ship_interdict_builder_handler" param="$builder" />
 						</do_for_each>
 					</actions>
+					<patch sinceversion="2">
+						<reset_cue cue="init_shipyard_event_handlers" />
+						<signal_cue cue="init_shipyard_event_handlers" />
+					</patch>
 					<cues>
+						<cue name="init_shipyard_event_handlers">
+							<conditions>
+								<event_cue_signalled />
+							</conditions>
+							<cues>
+								<!--
+									This cue is triggered for new L and XL builds completed by the tracked shipyards.
+									If the build is a fighting ship, it adds travel drive interdiction buff.
+									If the build is a build ship, it adds the builder handler cue.
+								-->
+								<cue name="cap_ship_interdict_fighting_ship_built_handler_v2">
+									<conditions>
+										<event_build_finished group="$trackedshipyards" />
+										<check_value value="@event.param3.isshipbuild and @event.param3.buildobject.isclass.[class.ship_l, class.ship_xl]" />
+									</conditions>
+									<actions>
+										<do_if value="event.param3.buildobject.primarypurpose == purpose.fight">
+											<debug_to_file text="'==cap_ship_interdict==new fighting capital ship built: ' + @event.param3.buildobject.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+											<signal_cue_instantly cue="cap_ship_interdict_buffmgr" param="event.param3.buildobject" />
+										</do_if>
+										<do_if value="event.param3.buildobject.primarypurpose == purpose.build">
+											<debug_to_file text="'==cap_ship_interdict==new build ship built: ' + @event.param3.buildobject.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+											<signal_cue_instantly cue="cap_ship_interdict_builder_handler" param="event.param3.buildobject" />
+										</do_if>
+										<reset_cue cue="this" />
+									</actions>
+								</cue>
+							</cues>
+						</cue>
 						<!--
 							This cue is signaled for build ships.
 							Its sub-cue checks whether the build ship has built a new shipyard, and if it has then it adds to
@@ -61,7 +96,7 @@
 								<signal_cue cue="init_builder_event_handlers" />
 							</actions>
 							<cues>
-								<cue name="init_builder_event_handlers" instantiate="true">
+								<cue name="init_builder_event_handlers">
 									<conditions>
 										<event_cue_signalled />
 									</conditions>
@@ -74,7 +109,8 @@
 												<do_if value="event.param.isshipyard">
 													<debug_to_file text="'==cap_ship_interdict==Builder %s (%s) built %s'.[$builder.knownname, $builder.idcode, @event.param.debugname]" name="'builder_' + $builder.idcode + '.log'" directory="'cap_ship_interdict'" />
 													<debug_to_file text="'==cap_ship_interdict==new shipyard built: ' + @event.param.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
-													<append_to_list name="$trackedshipyards" exact="event.param" />
+													<add_to_group groupname="$trackedshipyards" object="event.param" />
+													<reset_cue cue="this" />
 												</do_if>
 											</actions>
 										</cue>
@@ -91,39 +127,8 @@
 								</cue>
 							</cues>
 						</cue>
-						<!--
-							This cue is triggered for new L and XL builds completed by the tracked shipyards.
-							If the build is a fighting ship, it adds travel drive interdiction buff.
-							If the build is a build ship, it adds the builder handler cue.
-						-->
-						<cue name="cap_ship_interdict_fighting_ship_built_handler">
-							<conditions>
-								<event_build_finished group="$trackedshipyards" />
-								<check_value value="event.param3.buildobject.isclass.[class.ship_l, class.ship_xl]" />
-							</conditions>
-							<actions>
-								<do_if value="event.param3.buildobject.primarypurpose == purpose.fight">
-									<debug_to_file text="'==cap_ship_interdict==new fighting capital ship built: ' + @event.param3.buildobject.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
-									<signal_cue_instantly cue="cap_ship_interdict_buffmgr" param="event.param3.buildobject" />
-								</do_if>
-								<do_if value="event.param3.buildobject.primarypurpose == purpose.build">
-									<debug_to_file text="'==cap_ship_interdict==new build ship built: ' + @event.param3.buildobject.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
-									<signal_cue_instantly cue="cap_ship_interdict_builder_handler" param="event.param3.buildobject" />
-								</do_if>
-							</actions>
-						</cue>
-						<!-- 
-							This cue is triggered when a tracked shipyard is destroyed, removing it from the tracked list.
-						-->
-						<cue name="cap_ship_interdict_shipyard_destroyed_handler">
-							<conditions>
-								<event_object_destroyed group="$trackedshipyards" />
-							</conditions>
-							<actions>
-								<debug_to_file text="'==cap_ship_interdict==shipyard destroyed: ' + @event.object.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
-								<remove_from_list name="$trackedshipyards" exact="event.object" />
-							</actions>
-						</cue>
+						<cue name="cap_ship_interdict_fighting_ship_built_handler" comment="removed in v3" />
+						<cue name="cap_ship_interdict_shipyard_destroyed_handler" comment="removed in v3" />
 						<!--
 							This cue is triggered for new L and XL ships created by god.
 							If the created ship is a fighting ship, it adds travel drive interdiction buff.
@@ -143,6 +148,7 @@
 									<debug_to_file text="'==cap_ship_interdict==new build ship spawned: ' + @event.param.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
 									<signal_cue_instantly cue="cap_ship_interdict_builder_handler" param="event.param" />
 								</do_if>
+								<reset_cue cue="this" />
 							</actions>
 						</cue>
 					</cues>
@@ -170,7 +176,7 @@
 				<signal_cue cue="activate_ship_event_handlers" />
 			</actions>
 			<cues>
-				<cue name="activate_ship_event_handlers" instantiate="true" comment="this is a wrapper which prevents the condition checks from evaluating beore $locship exists">
+				<cue name="activate_ship_event_handlers" comment="this is a wrapper which prevents the condition checks from evaluating beore $locship exists">
 					<conditions>
 						<event_cue_signalled />
 					</conditions>
