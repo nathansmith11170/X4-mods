@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mdscript name="BuyOrSellStation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="..\..\..\libraries\md.xsd">
+  <cues>
+
+    <cue name="BuySell_Main_ConversationExtensionManagerSupport" instantiate="true">
+      <conditions>
+        <event_cue_signalled/>
+      </conditions>
+      <actions>
+        <add_player_choice_sub text="{72734373,3027}" section="BuySell_Main_InContact_Menu"/>
+      </actions>
+    </cue>
+
+    <cue name="BuySell_Main_Contact_Handler" instantiate="true">
+      <conditions>
+        <check_any>
+          <event_conversation_started conversation="default"/>
+          <event_conversation_returned_to_section section="default"/>
+        </check_any>
+        <check_any>
+          <check_all>
+            <check_value value="event.object.controlpost == controlpost.manager and not event.object.station.isplanneddefencestation and not event.object.station.isplannedshipyard and not event.object.station.isplannedwharf and not event.object.station.istradestation and not event.object.station.isfactionheadquarters" />
+          </check_all>
+        </check_any>
+      </conditions>
+      <actions>
+        <do_if value="@md.ExtendedConversationMenu.Main.exists">
+          <set_value name="md.ExtendedConversationMenu.Main.$convOptions.$BuySellStationMenu" exact="table[ $signalCue = BuySell_Main_ConversationExtensionManagerSupport, $params = [] ]"/>
+        </do_if>
+        <do_else>
+          <signal_cue_instantly cue="BuySell_Main_ConversationExtensionManagerSupport"/>
+        </do_else>
+      </actions>
+    </cue>
+
+    <cue name="BuySell_Main_InContact_Menu_Handler" instantiate="true">
+      <conditions>
+        <check_any>
+          <event_conversation_next_section section="BuySell_Main_InContact_Menu"/>
+          <event_conversation_returned_to_section section="BuySell_Main_InContact_Menu"/>
+        </check_any>
+      </conditions>
+      <actions>
+        <add_player_choice text="{72734373,3012}" section="BuySell_Main_AppraiseStation"/>
+        <do_if value="event.object.station.owner == faction.player">
+          <add_player_choice text="{72734373,3032}" section="BuySell_Main_InContact_SelectRemovalOption"/>
+        </do_if>
+        <do_else>
+          <add_player_choice text="{72734373,3029}" section="BuySell_Main_InContact_SelectRemovalOption"/>
+        </do_else>
+      </actions>
+    </cue>
+
+    <cue name="BuySell_Main_AppraiseStation_Handler" instantiate="true">
+      <conditions>
+        <check_any>
+          <event_conversation_next_section section="BuySell_Main_AppraiseStation"/>
+        </check_any>
+      </conditions>
+      <actions>
+        <do_if value="event.object.station.owner == faction.player">
+          <!-- appraise for sale -->
+          <set_value name="$StationPrice" exact="(event.object.container.value)ct" />
+          <set_value name="$CargoPrice" exact="0ct" />
+          <do_for_each name="$Ware" in="event.object.container.cargo.table.keys.list">
+            <set_value name="$CargoPrice" exact="(event.object.container.cargo.{$Ware}.count * $Ware.maxprice)ct" operation="add"/>
+          </do_for_each>
+          <set_value name="$BuildPlotPrice" exact="(event.object.station.buildplot.price)ct" />
+
+          <set_value name="$TotalPrice" exact="$StationPrice + $CargoPrice + $BuildPlotPrice" />
+
+          <write_to_logbook category="upkeep" title="'Appraisal of %s for sale'.[event.object.station.name]" text="'Price of station modules and drones: %1\nTotal price of station\'s cargo, evaluated at max ware price: %2\nPrice of build plot: %3\nTotal: %4\nNote that this base price is multiplied by a small bonus for good faction relations.'.[$StationPrice.formatted.default, $CargoPrice.formatted.default, $BuildPlotPrice.formatted.default, $TotalPrice.formatted.default]"/>
+        </do_if>
+        <do_else>
+          <!-- appraise for purchase -->
+          <set_value name="$StationPrice" exact="event.object.container.value" />
+          <set_value name="$CargoPrice" exact="0ct" />
+          <do_for_each name="$Ware" in="event.object.container.cargo.table.keys.list">
+            <set_value name="$CargoPrice" exact="(event.object.container.cargo.{$Ware}.count * $Ware.maxprice)ct" operation="add"/>
+          </do_for_each>
+          <set_value name="$BuildPlotPrice" exact="event.object.station.buildplot.price" />
+
+          <create_list name="$AverageRelativePricesOfProducts" />
+          <do_for_each name="$Ware" in="event.object.container.products.list">
+            <set_value name="$AverageRelativePriceOfProduct" exact="0f" />
+            <find_station_by_true_owner name="$StationsProducingWare" faction="event.object.station.owner" space="player.galaxy" multiple="true">
+              <match_products wares="$Ware"/>
+            </find_station_by_true_owner>
+            <debug_text text="'%s stations owned by %s producing ware %s'.[$StationsProducingWare.count, event.object.station.owner.name, $Ware.name]" />
+            <do_for_each name="$Station" in="$StationsProducingWare">
+              <find_sell_offer result="$Trade" seller="$Station" wares="$Ware" />
+              <set_value name="$AverageRelativePriceOfProduct" exact="$Trade.relativeprice" operation="add" />
+            </do_for_each>
+            <do_if value="$StationsProducingWare.count gt 1">
+              <set_value name="$AverageRelativePriceOfProduct" exact="$AverageRelativePriceOfProduct / ($StationsProducingWare.count)f" />
+            </do_if>
+            <do_else>
+              <!-- If this is the last station producing ware it gets maximum relative price factor -->
+              <set_value name="$AverageRelativePriceOfProduct" exact="1.0f" />
+            </do_else>
+            <debug_text text="'Average relative price of %s for producing stations is %s'.[$Ware.name, $AverageRelativePriceOfProduct]" />
+            <append_to_list name="$AverageRelativePricesOfProducts" exact="$AverageRelativePriceOfProduct" />
+            <remove_value name="$AverageRelativePriceOfProduct" />
+          </do_for_each>
+          <set_value name="$MaxRelativePriceOfAnyProduct" exact="$AverageRelativePricesOfProducts.max" />
+          <clear_list list="$AverageRelativePricesOfProducts" />
+          <debug_text text="'Max relative price of %s\'s products is %s'.[event.object.station.name, $MaxRelativePriceOfAnyProduct]" />
+          <do_if value="$MaxRelativePriceOfAnyProduct lt 0">
+            <debug_text text="'Max relative price of %s\'s products is less than 0, setting factor to 0'.[event.object.station.name]" />
+            <set_value name="$MaxRelativePriceOfAnyProduct" exact="0" />
+          </do_if>
+
+          <set_value name="$FinalPrice" exact="(($StationPrice + $CargoPrice + $BuildPlotPrice) ^ (1+($MaxRelativePriceOfAnyProduct/10)))ct" />
+
+          <write_to_logbook category="upkeep" title="'Appraisal of %s for purchase'.[event.object.station.name]" text="'Price of station modules and drones: %s\nTotal price of station\'s cargo, evaluated at max ware price: %s\nPrice of build plot: %s\nBased on the station\'s %s products, product scarcity exponent: %s\nTotal: %s'.[$StationPrice.formatted.default, $CargoPrice.formatted.default, $BuildPlotPrice.formatted.default, event.object.container.products.count, (1+($MaxRelativePriceOfAnyProduct/10))f, $FinalPrice.formatted.default]"/>
+        </do_else>
+      </actions>
+    </cue>
+
+    <cue name="BuySell_Main_InContact_SelectRemovalOption_Handler" instantiate="true">
+      <conditions>
+        <check_any>
+          <event_conversation_next_section section="BuySell_Main_InContact_SelectRemovalOption"/>
+          <event_conversation_returned_to_section section="BuySell_Main_InContact_SelectRemovalOption"/>
+        </check_any>
+      </conditions>
+      <actions>
+        <do_if value="event.param2 == 'confirm'">
+          <add_player_choice text="{72734373,3028}" section="BuySell_Main_BuySell"/>
+          <add_player_choice text="{72734373,3011}" section="BuySell_Main_InContact_SelectRemovalOption"/>
+        </do_if>
+        <do_else>
+          <do_if value="event.object.container.isplayerowned">
+            <add_player_choice_sub text="{72734373,3032}" section="BuySell_Main_SellStation_SelectFaction"/>
+            <add_player_choice_return position="bottom_right" text="{72734373,3011}"/>
+          </do_if>
+          <do_else>
+            <!-- appraise for purchase -->
+            <set_value name="$StationPrice" exact="event.object.container.value" />
+            <set_value name="$CargoPrice" exact="0ct" />
+            <do_for_each name="$Ware" in="event.object.container.cargo.table.keys.list">
+              <set_value name="$CargoPrice" exact="(event.object.container.cargo.{$Ware}.count * $Ware.maxprice)ct" operation="add"/>
+            </do_for_each>
+            <set_value name="$BuildPlotPrice" exact="event.object.station.buildplot.price" />
+
+            <create_list name="$AverageRelativePricesOfProducts" />
+            <do_for_each name="$Ware" in="event.object.container.products.list">
+              <set_value name="$AverageRelativePriceOfProduct" exact="0f" />
+              <find_station_by_true_owner name="$StationsProducingWare" faction="event.object.station.owner" space="player.galaxy" multiple="true">
+                <match_products wares="$Ware"/>
+              </find_station_by_true_owner>
+              <debug_text text="'%s stations owned by %s producing ware %s'.[$StationsProducingWare.count, event.object.station.owner.name, $Ware.name]" />
+              <do_for_each name="$Station" in="$StationsProducingWare">
+                <find_sell_offer result="$Trade" seller="$Station" wares="$Ware" />
+                <set_value name="$AverageRelativePriceOfProduct" exact="$Trade.relativeprice" operation="add" />
+              </do_for_each>
+              <do_if value="$StationsProducingWare.count gt 1">
+                <set_value name="$AverageRelativePriceOfProduct" exact="$AverageRelativePriceOfProduct / ($StationsProducingWare.count)f" />
+              </do_if>
+              <do_else>
+                <!-- If this is the last station producing ware it gets maximum relative price factor -->
+                <set_value name="$AverageRelativePriceOfProduct" exact="1.0f" />
+              </do_else>
+              <debug_text text="'Average relative price of %s for producing stations is %s'.[$Ware.name, $AverageRelativePriceOfProduct]" />
+              <append_to_list name="$AverageRelativePricesOfProducts" exact="$AverageRelativePriceOfProduct" />
+              <remove_value name="$AverageRelativePriceOfProduct" />
+            </do_for_each>
+            <set_value name="$MaxRelativePriceOfAnyProduct" exact="$AverageRelativePricesOfProducts.max" />
+            <clear_list list="$AverageRelativePricesOfProducts" />
+            <debug_text text="'Max relative price of %s\'s products is %s'.[event.object.station.name, $MaxRelativePriceOfAnyProduct]" />
+            <do_if value="$MaxRelativePriceOfAnyProduct lt 0">
+              <debug_text text="'Max relative price of %s\'s products is less than 0, setting factor to 0'.[event.object.station.name]" />
+              <set_value name="$MaxRelativePriceOfAnyProduct" exact="0" />
+            </do_if>
+
+            <set_value name="$FinalPrice" exact="(($StationPrice + $CargoPrice + $BuildPlotPrice) ^ (1+($MaxRelativePriceOfAnyProduct/10)))ct" />
+            <write_to_logbook category="upkeep" title="'Appraisal of %s for purchase'.[event.object.station.name]" text="'Price of station modules and drones: %s\nTotal price of station\'s cargo, evaluated at max ware price: %s\nPrice of build plot: %s\nBased on the station\'s %s products, product scarcity exponent: %s\nTotal: %s'.[$StationPrice.formatted.default, $CargoPrice.formatted.default, $BuildPlotPrice.formatted.default, event.object.container.products.count, (1+($MaxRelativePriceOfAnyProduct/10))f, $FinalPrice.formatted.default]"/>
+            <add_player_choice_sub text="{72734373, 3029} + ' for (%1)'.[$FinalPrice.formatted.{'%1cs %Cr'}]" position="1" choiceparam="[event.object.station.owner, $FinalPrice]" section="BuySell_Main_ExecuteBuy"/>
+            <add_player_choice_return position="bottom_right" text="{72734373,3011}"/>
+          </do_else>
+        </do_else>
+      </actions>
+    </cue>
+
+    <cue name="BuySell_Main_SellStation_SelectFaction_Handler" instantiate="true">
+      <conditions>
+        <check_any>
+          <event_conversation_next_section section="BuySell_Main_SellStation_SelectFaction"/>
+          <event_conversation_returned_to_section section="BuySell_Main_SellStation_SelectFaction"/>
+        </check_any>
+      </conditions>
+      <actions>
+        <do_if value="event.param2 == 'previous'">
+          <set_value name="$page" operation="subtract"/>
+        </do_if>
+        <do_elseif value="event.param2 == 'next'">
+          <set_value name="$page" operation="add"/>
+        </do_elseif>
+        <do_else>
+          <set_value name="$page" exact="0"/>
+        </do_else>
+
+        <set_value name="$validFactions" exact="[faction.antigone, faction.argon, faction.holyorder, faction.ministry, faction.paranid, faction.teladi, faction.hatikvah, faction.scaleplate]"/>
+        <include_actions ref="PrepForSplitFactions"/>
+        <include_actions ref="AddCradleFactions"/>
+        <include_actions ref="AddAvariceFactions" />
+        <include_actions ref="CheckAddStoryFactions"/>
+
+        <do_all exact="$validFactions.count" counter="$i" reverse="true">
+          <do_if value="$validFactions.{$i} == null or $validFactions.{$i}.relationto.{faction.player} lt -0.0032">
+            <remove_value name="$validFactions.{$i}"/>
+          </do_if>
+        </do_all>
+
+        <do_all exact="4" counter="$i">
+          <set_value name="$actualSiteItemId" exact="$i + (4 * $page)"/>
+          <do_if value="$validFactions.count lt $actualSiteItemId">
+            <break/>
+          </do_if>
+
+          <set_value name="$faction" exact="$validFactions.{$actualSiteItemId}"/>
+          <set_value name="$relation" exact="$faction.relationto.{faction.player}"/>
+          <include_actions ref="BuySell_Main_CalculatePrice" comment="Inputs: $faction $relation event | Sets $TotalPrice"/>
+          <do_if value="$faction != null">
+            <add_player_choice_sub text="'%1 (%2)'.[$faction.name, $TotalPrice.formatted.{'%1cs %Cr'}]" position="$i" choiceparam="[$actualSiteItemId, $faction, $relation, $TotalPrice]" section="BuySell_Main_SellStation_ExecuteSell"/>
+          </do_if>
+        </do_all>
+
+        <do_if value="$page == 0">
+          <add_player_choice_return position="bottom_right" text="{72734373,3011}"/>
+        </do_if>
+        <do_else>
+          <add_player_choice text="{72734373,3009}" choiceparam="'previous'" position="bottom_right" section="BuySell_Main_SellStation_SelectFaction"/>
+        </do_else>
+        <do_if value="$validFactions.count gt 4">
+          <add_player_choice text="{72734373,3010}" choiceparam="'next'" position="right" section="BuySell_Main_SellStation_SelectFaction"/>
+        </do_if>
+      </actions>
+    </cue>
+
+    <cue name="BuySell_Main_SellStation_ExecuteSell_Handler" instantiate="true">
+      <conditions>
+        <check_any>
+          <event_conversation_next_section section="BuySell_Main_SellStation_ExecuteSell"/>
+          <event_conversation_returned_to_section section="BuySell_Main_SellStation_ExecuteSell"/>
+        </check_any>
+      </conditions>
+      <actions>
+        <do_if value="@event.param2.{2} != null and @event.param2.{4} != null">
+          <set_value name="$cash" exact="(event.param2.{4})ct"/>
+          <write_to_logbook money="$cash" title="{72734373,3034}.[event.param2.{2}.name]" category="upkeep" text="event.object.container.name + {72734373,3035} + event.object.container.sector.name + {72734373,3036} + event.param2.{2}.name + {72734373,3037} + $cash.formatted.{'%s'} + {72734373,3038}"/>
+          <reward_player money="(event.param2.{4})ct"/>
+          <set_value name="$Station" exact="event.object.station" />
+          <set_value name="$Faction" exact="event.param2.{2}" />
+          <include_actions ref="md.LIB_Generic.TransferStationOwnership" comment="input: $Station, $Faction"/>
+        </do_if>
+      </actions>
+    </cue>
+
+    <cue name="BuySell_Main_SellStation_ExecuteBuy_Handler" instantiate="true">
+      <conditions>
+        <check_any>
+          <event_conversation_next_section section="BuySell_Main_ExecuteBuy"/>
+          <event_conversation_returned_to_section section="BuySell_Main_ExecuteBuy"/>
+        </check_any>
+      </conditions>
+      <actions>
+        <do_if value="(player.money)ct gt (event.param2.{2})ct">
+          <set_value name="$cash" exact="(event.param2.{2})ct"/>
+          <write_to_logbook money="-$cash" title="{72734373,3030}.[event.param2.{1}.name]" category="upkeep" text="event.object.container.name + {72734373,3035} + event.object.container.sector.name + {72734373,3039} + event.param2.{1}.name + {72734373,3037} + $cash.formatted.{'%s'} + {72734373,3038}"/>
+          <reward_player money="-(event.param2.{2})ct"/>
+          <set_value name="$Station" exact="event.object.station" />
+          <set_value name="$Faction" exact="faction.player" />
+          <include_actions ref="md.LIB_Generic.TransferStationOwnership" comment="input: $Station, $Faction"/>
+          <set_build_plot x="$Station.buildplot.max.x" y="$Station.buildplot.max.y" z="$Station.buildplot.max.z" paid="true" object="$Station" />
+        </do_if>
+        <do_else>
+          <set_value name="$cash" exact="(event.param2.{2})ct" />
+          <write_to_logbook title="{72734373,3030}.[event.param2.{1}.name]" category="upkeep" text="{72734373, 3040} + event.object.container.name + {72734373,3035} + event.object.container.sector.name + {72734373,3037} + $cash.formatted.{'%s'} + {72734373,3038}"/>
+        </do_else>
+      </actions>
+    </cue>
+
+    <library name="PrepForSplitFactions">
+      <actions>
+        <do_if value="@md.Setup_DLC_Split.Setup != null">
+          <append_to_list name="$validFactions" exact="@faction.freesplit"/>
+        </do_if>
+        <do_if value="@md.Setup_DLC_Split.Setup != null">
+          <append_to_list name="$validFactions" exact="@faction.split"/>
+        </do_if>
+      </actions>
+    </library>
+
+    <library name="AddAvariceFactions">
+      <actions>
+        <do_if value="@md.Setup_DLC_Pirate.Setup != null">
+          <append_to_list name="$validFactions" exact="@faction.loanshark"/>
+        </do_if>
+        <do_if value="@md.Setup_DLC_Pirate.Setup != null">
+          <append_to_list name="$validFactions" exact="@faction.scavenger"/>
+        </do_if>
+      </actions>
+    </library>
+
+    <library name="AddCradleFactions">
+      <actions>
+        <do_if value="@md.Setup_DLC_Terran.Setup != null">
+          <append_to_list name="$validFactions" exact="@faction.pioneers"/>
+          <append_to_list name="$validFactions" exact="@faction.terran"/>
+          <append_to_list name="$validFactions" exact="@faction.yaki"/>
+        </do_if>
+      </actions>
+    </library>
+
+    <library name="CheckAddStoryFactions">
+      <actions>
+        <do_for_each name="$_faction" in="[@faction.court, @faction.trinity]">
+          <do_if value="$_faction == null">
+            <continue/>
+          </do_if>
+          <find_station name="$_station" owner="$_faction" space="player.galaxy"/>
+          <do_if value="@$_station.exists">
+            <append_to_list name="$validFactions" exact="@$_faction"/>
+          </do_if>
+        </do_for_each>
+      </actions>
+    </library>
+
+    <library name="BuySell_Main_CalculatePrice">
+      <actions>
+        <do_if value="$relation ge 0.0032 and $relation lt 0.01">
+          <set_value name="$priceModifier" exact="0.05"/>
+        </do_if>
+        <do_if value="$relation ge 0.01 and $relation lt 0.032">
+          <set_value name="$priceModifier" exact="0.1"/>
+        </do_if>
+        <do_elseif value="$relation ge 0.032 and $relation lt 0.1">
+          <set_value name="$priceModifier" exact="0.15"/>
+        </do_elseif>
+        <do_elseif value="$relation ge 0.1 and $relation lt 0.32">
+          <set_value name="$priceModifier" exact="0.2"/>
+        </do_elseif>
+        <do_elseif value="$relation ge 0.32">
+          <set_value name="$priceModifier" exact="0.3"/>
+        </do_elseif>
+        <do_else>
+          <set_value name="$priceModifier" exact="0.0"/>
+        </do_else>
+
+        <!-- appraise for sale -->
+        <set_value name="$StationPrice" exact="(event.object.container.value)ct" />
+        <set_value name="$CargoPrice" exact="0" />
+        <do_for_each name="$Ware" in="event.object.container.cargo.table.keys.list">
+          <set_value name="$CargoPrice" exact="(event.object.container.cargo.{$Ware}.count * $Ware.maxprice)ct" operation="add"/>
+        </do_for_each>
+        <set_value name="$BuildPlotPrice" exact="(event.object.station.buildplot.price)ct" />
+
+        <set_value name="$TotalPrice" exact="($StationPrice + $CargoPrice + $BuildPlotPrice) * (1+$priceModifier)" />
+      </actions>
+    </library>
+
+  </cues>
+</mdscript>

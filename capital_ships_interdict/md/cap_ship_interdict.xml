@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mdscript name="cap_ship_interdict" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="md.xsd">
+	<cues>
+		<!--
+			Startup cue that assigns a buff manager to each detected fighting capital ship.
+			Also begins the monitor cue which handles the creation of new ships and new shipyards.
+		-->
+		<cue name="cap_ship_interdict_Init" checktime="5s" checkinterval="5s">
+			<conditions>
+				<cue_is_complete cue="md.Setup.GameStart" />
+			</conditions>
+			<delay exact="0.1s" />
+			<actions>
+				<debug_to_file text="'==cap_ship_interdict==mod started'" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+				<find_ship name="$allFightingCapitalShips" primarypurpose="purpose.fight" class="[class.ship_l, class.ship_xl]" space="player.galaxy" checkoperational="true" multiple="true" />
+				<debug_to_file text="'==cap_ship_interdict==all fighting capital ships count: ' + $allFightingCapitalShips.count" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+
+				<signal_cue cue="cap_ship_interdict_handlers" />
+
+				<!-- start buff on all fighting capitals -->
+				<do_for_each in="$allFightingCapitalShips" name="$capShip">
+					<signal_cue_instantly cue="cap_ship_interdict_buffmgr" param="$capShip" />
+				</do_for_each>
+			</actions>
+			<cues>
+				<!--
+					This cue is signaled on initialization and will create a list of shipyards in the galaxy.
+					Those shipyards will be part of an event group for the sub-cue.
+					It also adds the builder handler cue to existing build ships.
+				-->
+				<cue name="cap_ship_interdict_handlers">
+					<conditions>
+						<event_cue_signalled />
+					</conditions>
+					<actions>
+						<find_station groupname="$trackedshipyards" space="player.galaxy" multiple="true" shipyard="true" />
+						<debug_to_file text="'==cap_ship_interdict==all shipyards count: ' + $trackedshipyards.count" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+					</actions>
+					<delay min="1s" max="2s" />
+					<actions>
+						<find_ship name="$builders" space="player.galaxy" multiple="true" primarypurpose="purpose.build" class="class.ship_xl" />
+						<debug_to_file text="'==cap_ship_interdict==all builder ships count: ' + $builders.count" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+						<do_for_each in="$builders" name="$builder">
+							<signal_cue_instantly cue="cap_ship_interdict_builder_handler" param="$builder" />
+						</do_for_each>
+					</actions>
+					<cues>
+						<!--
+							This cue is signaled for build ships.
+							Its sub-cue checks whether the build ship has built a new shipyard, and if it has then it adds to
+							the $trackedshipyards
+						-->
+						<cue name="cap_ship_interdict_builder_handler" instantiate="true">
+							<conditions>
+								<event_cue_signalled />
+							</conditions>
+							<delay min="0.5s" max="1s" />
+							<actions>
+								<set_value name="$builder" exact="event.param" />
+								<debug_to_file text="'==cap_ship_interdict==Builder %s (%s) started'.[$builder.knownname, $builder.idcode]" name="'builder_' + $builder.idcode + '.log'" directory="'cap_ship_interdict'" />
+								<signal_cue cue="init_builder_event_handlers" />
+							</actions>
+							<cues>
+								<cue name="init_builder_event_handlers" instantiate="true">
+									<conditions>
+										<event_cue_signalled />
+									</conditions>
+									<cues>
+										<cue name="cap_ship_interdict_builder_object_built">
+											<conditions>
+												<event_object_built_station object="$builder" />
+											</conditions>
+											<actions>
+												<do_if value="event.param.isshipyard">
+													<debug_to_file text="'==cap_ship_interdict==Builder %s (%s) built %s'.[$builder.knownname, $builder.idcode, @event.param.debugname]" name="'builder_' + $builder.idcode + '.log'" directory="'cap_ship_interdict'" />
+													<debug_to_file text="'==cap_ship_interdict==new shipyard built: ' + @event.param.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+													<append_to_list name="$trackedshipyards" exact="event.param" />
+												</do_if>
+											</actions>
+										</cue>
+										<cue name="cap_ship_interdict_builder_destroyed_handler">
+											<conditions>
+												<event_object_destroyed object="$builder" />
+											</conditions>
+											<actions>
+												<debug_to_file text="'==cap_ship_interdict==Builder %s (%s) destroyed'.[$builder.knownname, $builder.idcode]" name="'builder_' + $builder.idcode + '.log'" directory="'cap_ship_interdict'" />
+												<cancel_cue cue="parent" />
+											</actions>
+										</cue>
+									</cues>
+								</cue>
+							</cues>
+						</cue>
+						<!--
+							This cue is triggered for new L and XL builds completed by the tracked shipyards.
+							If the build is a fighting ship, it adds travel drive interdiction buff.
+							If the build is a build ship, it adds the builder handler cue.
+						-->
+						<cue name="cap_ship_interdict_fighting_ship_built_handler">
+							<conditions>
+								<event_build_finished group="$trackedshipyards" />
+								<check_value value="event.param3.buildobject.isclass.[class.ship_l, class.ship_xl]" />
+							</conditions>
+							<actions>
+								<do_if value="event.param3.buildobject.primarypurpose == purpose.fight">
+									<debug_to_file text="'==cap_ship_interdict==new fighting capital ship built: ' + @event.param3.buildobject.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+									<signal_cue_instantly cue="cap_ship_interdict_buffmgr" param="event.param3.buildobject" />
+								</do_if>
+								<do_if value="event.param3.buildobject.primarypurpose == purpose.build">
+									<debug_to_file text="'==cap_ship_interdict==new build ship built: ' + @event.param3.buildobject.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+									<signal_cue_instantly cue="cap_ship_interdict_builder_handler" param="event.param3.buildobject" />
+								</do_if>
+							</actions>
+						</cue>
+						<!-- 
+							This cue is triggered when a tracked shipyard is destroyed, removing it from the tracked list.
+						-->
+						<cue name="cap_ship_interdict_shipyard_destroyed_handler">
+							<conditions>
+								<event_object_destroyed group="$trackedshipyards" />
+							</conditions>
+							<actions>
+								<debug_to_file text="'==cap_ship_interdict==shipyard destroyed: ' + @event.object.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+								<remove_from_list name="$trackedshipyards" exact="event.object" />
+							</actions>
+						</cue>
+						<!--
+							This cue is triggered for new L and XL ships created by god.
+							If the created ship is a fighting ship, it adds travel drive interdiction buff.
+							If the created ship is a build ship, it adds the builder handler cue. 
+						-->
+						<cue name="cap_ship_interdict_god_created_ship_handler">
+							<conditions>
+								<event_god_created_object space="player.galaxy" />
+								<check_value value="event.param.isclass.[class.ship_l, class.ship_xl]" />
+							</conditions>
+							<actions>
+								<do_if value="event.param.primarypurpose == purpose.fight">
+									<debug_to_file text="'==cap_ship_interdict==new fighting capital ship spawned: ' + @event.param.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+									<signal_cue_instantly cue="cap_ship_interdict_buffmgr" param="event.param" />
+								</do_if>
+								<do_if value="event.param.primarypurpose == purpose.build">
+									<debug_to_file text="'==cap_ship_interdict==new build ship spawned: ' + @event.param.debugname" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+									<signal_cue_instantly cue="cap_ship_interdict_builder_handler" param="event.param" />
+								</do_if>
+							</actions>
+						</cue>
+					</cues>
+				</cue>
+			</cues>
+		</cue>
+		<!--
+			This cue is the manager of the interdiction buff.
+			It keeps track of the ship it is assigned to via $locship and serves as a namespace for sub-cues.
+		-->
+		<cue name="cap_ship_interdict_buffmgr" instantiate="true" namespace="this">
+			<conditions>
+				<event_cue_signalled />
+			</conditions>
+			<delay min="0.5s" max="1s" />
+			<actions>
+				<do_if value="not event.param.exists">
+					<debug_to_file text="'==cap_ship_interdict==ship no longer exists, cancelling interdiction effect.'" name="'cap_ship_interdict.log'" directory="'cap_ship_interdict'" />
+					<cancel_cue cue="this" />
+				</do_if>
+				<do_else>
+					<set_value name="$locship" exact="event.param" />
+					<debug_to_file text="'==cap_ship_interdict==Ship %s (%s) acquiring interdiction cue'.[$locship.knownname, $locship.idcode]" name="'fighting_ship_' + $locship.idcode + '.log'" directory="'cap_ship_interdict'" />
+				</do_else>
+				<signal_cue cue="activate_ship_event_handlers" />
+			</actions>
+			<cues>
+				<cue name="activate_ship_event_handlers" instantiate="true" comment="this is a wrapper which prevents the condition checks from evaluating beore $locship exists">
+					<conditions>
+						<event_cue_signalled />
+					</conditions>
+					<cues>
+						<!--
+							This cue handles the destruction of the assigned ship, cleaning up the buff manager. 
+						-->
+						<cue name="ship_destroyed_handler">
+							<conditions>
+								<event_object_destroyed object="$locship" />
+							</conditions>
+							<actions>
+								<debug_to_file text="'==cap_ship_interdict==Ship %s (%s) destroyed, clean up'.[$locship.knownname, $locship.idcode]" name="'fighting_ship_' + $locship.idcode + '.log'" directory="'cap_ship_interdict'" />
+								<cancel_cue cue="parent" />
+							</actions>
+						</cue>
+						<!--
+							This cue handles the travel drive disruption effect. 
+						-->
+						<cue name="travel_disruptor_handler">
+							<conditions>
+								<event_object_enemy_found object="$locship" />
+								<check_value value="not event.param.isclass.ship_xs" />
+							</conditions>
+							<actions>
+								<debug_to_file text="'%s (%s) detected hostiles, starting interdiction'.[$locship.knownname, $locship.idcode]" name="'fighting_ship_' + $locship.idcode + '.log'" directory="'cap_ship_interdict'" />
+								<set_value name="$sleep_counter" exact="0" />
+							</actions>
+							<cues>
+								<cue name="travel_disruptor">
+									<actions>
+										<find_gravidar_contact groupname="$enemies" object="$locship" multiple="true" class="[class.ship_s, class.ship_m, class.ship_l, class.ship_xl]" docked="false" masstraffic="false" checkoperational="true" maybeattackedby="$locship">
+											<match_context macro="$locship.sector.macro" />
+											<match_distance object="$locship" max="$locship.currentradarrange" />
+										</find_gravidar_contact>
+										<debug_to_file text="'%s (%s) detected hostile count: %s'.[$locship.knownname, $locship.idcode, $enemies.count]" name="'fighting_ship_' + $locship.idcode + '.log'" directory="'cap_ship_interdict'" />
+										<do_if value="$enemies.count">
+											<do_for_each name="$enemy" in="$enemies">
+												<debug_to_file text="'%s (%s) disrupting travel drive of %s (%s)'.[$locship.knownname, $locship.idcode, $enemy.knownname, $enemy.idcode]" name="'fighting_ship_' + $locship.idcode + '.log'" directory="'cap_ship_interdict'" />
+												<disable_travel_mode ship="$enemy" duration="5.01s" />
+											</do_for_each>
+										</do_if>
+										<do_else>
+											<debug_to_file text="'%s (%s) no hostiles remaining on scanner, counting up to 5 before standing down: %s'.[$locship.knownname, $locship.idcode, $sleep_counter]" name="'fighting_ship_' + $locship.idcode + '.log'" directory="'cap_ship_interdict'" />
+											<set_value name="$sleep_counter" operation="add" />
+										</do_else>
+										<remove_value name="$enemies" />
+									</actions>
+									<delay min="2s" max="3s" />
+									<actions>
+										<do_if value="$sleep_counter gt 5">
+											<reset_cue cue="parent" />
+										</do_if>
+										<do_else>
+											<reset_cue cue="this" />
+										</do_else>
+									</actions>
+								</cue>
+							</cues>
+						</cue>
+					</cues>
+				</cue>
+			</cues>
+		</cue>
+	</cues>
+</mdscript>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<language id="49">
+  <page id="72734373" title="md buyandsellstation" descr="Names and descriptions" voice="no">
+    <t id="3009">Seite zurück</t>
+    <t id="3010">Seite vor</t>
+    <t id="3011">Zurück</t>
+    <t id="3012">Stationswert schätzen</t>
+    <t id="3027">(conversation menu title)Station An-und-Verkauf</t>
+    <t id="3028">Bestätigen</t>
+    <t id="3029">Kaufe Station</t>
+    <t id="3030">\033#FFFF0000#Station gekauft von (faction)%s\033X</t>
+    <t id="3032">Verkaufe Station an Fraktion</t>
+    <t id="3034">\033GStation verkauft an (faction)%s\033X</t>
+    <t id="3035">(station) in (sector)</t>
+    <t id="3036"> wurde verkauft an (faction)</t>
+    <t id="3037"> für die Summe von:\n</t>
+    <t id="3038"> Credits.</t>
+    <t id="3039"> wurde gekauft von (faction)</t>
+    <t id="3040">Du kann dir dies nicht leisten </t>
+  </page>
+</language>

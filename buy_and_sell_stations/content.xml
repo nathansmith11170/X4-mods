@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<content id="buy_and_sell_stations" enabled="true" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" version="01" date="2023-02-18" save="false">
+    <text language="7" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" />
+    <text language="33" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" />
+    <text language="34" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" />
+    <text language="39" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" />
+    <text language="44" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" />
+    <text language="49" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" />
+    <text language="55" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" />
+    <text language="81" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" />
+    <text language="82" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" />
+    <text language="86" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" />
+    <text language="88" name="BuyAndSellStations" description="Player can sell stations to other factions and buy stations from other factions." author="General Vash" />
+</content>

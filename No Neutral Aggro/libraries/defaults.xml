@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<diff>
+  <replace sel="/defaults/dataset[@class='ship_xl']/properties/relation/attack/tolerance/@threshold">-100.0</replace>
+  <replace sel="/defaults/dataset[@class='ship_l']/properties/relation/attack/tolerance/@threshold">-100.0</replace>
+  <replace sel="/defaults/dataset[@class='ship_m']/properties/relation/attack/tolerance/@threshold">-100.00</replace>
+  <replace sel="/defaults/dataset[@class='ship_s']/properties/relation/attack/tolerance/@threshold">-100.0</replace>
+  <replace sel="/defaults/dataset[@class='station']/properties/relation/attack/tolerance/@threshold">-100.0</replace>
+</diff>

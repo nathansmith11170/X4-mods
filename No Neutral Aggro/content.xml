@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<content id="Cheat No Aggro From Neutrals"
+name="Cheat No Aggro From Neutrals"
+author="General Vash"
+version="7.50"
+date="2025-03-23"
+save="false"
+enabled="true">
+
+<text language="" description="Neutral ships will now only temp aggro against you if they take hundreds (perhaps thousands) of shots from your faction. This is intended to fix allied fleet combat, not as an exploit for pirate gameplay."/>
+</content>

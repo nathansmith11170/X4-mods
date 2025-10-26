@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<content id="cap_ship_interdict" name="Capital Ships Interdict" description="L and XL fighting ships halt travel drive of hostile S and M class ships in local space" date="2025-10-21" version="2" save="false" author="General Vash">
+  <text language="44" name="Capital Ships Interdict" description="L and XL fighting ships halt travel drive of hostile S and M class ships in local space" author="General Vash" />
+</content>
